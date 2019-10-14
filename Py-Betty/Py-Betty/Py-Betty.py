@@ -37,6 +37,9 @@ class settings: #more like a data struct
         #Indicators
         self.MaxBankAngle   #Max Banking Angle for Autopilot
 
+def SetSettings(data): #TODO: Iterate through to get a more definitive long term solution
+    data = {"Redline", "MaxTemp", "MaxOilTemp","MaxWaterTemp","MaxAoA","GearUp","GearDn","MaxRPM","Mach","Flaps1","Flaps2","Flaps3","GLoad","GLoad-Ve","MaxDescent","MaxAoS","BingoFuel","BingoFuelRepeats","Economy","MaxBankAngle"}
+
 class Navigation: #Mostly for autopilot integreation possibility
     def __init__(self):
         self.Compass        #Desired Compass Heading
@@ -65,10 +68,11 @@ class Program: #"blueprint"
             time.sleep(0.125)
 
 def PlayWarning(warningtype, indication):
-    print(warningtype + " Warning: " str(indication))#Replace this with sound playback l8r
-
+    print(str(warningtype) + " Warning: " + str(indication))  #Replace this with sound playback l8r
+    
 def CheckExceeded(warningtype, indication):
     print("CheckExceeded() | nothing here yet")
+    pass
 
 def FetchIndicators():
     indicators = []
@@ -112,7 +116,7 @@ def LoadChanges(ACType, settings):
         print(ACType + ".json loaded successfully")
     except:#no file present, file gets created when we save later
         print("No " + ACType + ".json file was found or was corrupted.")
-        settings = []
+        SetSettings(settings)
 
 #Basic navigation functions til we get UI
 # Accepts only integers
