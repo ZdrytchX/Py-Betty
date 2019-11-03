@@ -101,7 +101,7 @@ class Program: #"blueprint"
             time.sleep(0.125)
 
             #spinner thing to show it is active ripped from stackoverlow
-            sys.stdout.write(next(spinner))  # write the next character
+            sys.stdout.write(next(spinner))   # write the next character
             sys.stdout.flush()                # flush stdout buffer (actual character display)
             sys.stdout.write('\b')            # erase the last written char
 
@@ -120,7 +120,7 @@ def FetchIndicators():
         indicators = requests.get("http://localhost:8111/indicators", timeout=0.02).json()
         return indicators
     except:
-        indicators["alid"] = False
+        indicators["valid"] = False
         indicators["type"] = "zzz_unavailable"
         return indicators
 
