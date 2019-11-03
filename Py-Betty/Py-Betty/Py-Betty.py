@@ -11,6 +11,7 @@ import requests #this?
 import json
 #import some kind of sound library
 #import libao #pydub TODO
+import itertools, sys #spinner thing
 
 class settings: #more like a data struct
     def __init__(self):
@@ -57,26 +58,33 @@ class Navigation: #Mostly for autopilot integreation possibility
 
 class Program: #"blueprint"
     def __init__(ac, *args, **kwargs):
-        ac.indicators = FetchIndicators()
-        ac.state = FetchStatus()
         ACsettings = {}
         currentACType = "zzz_unavailable"
         ACActive = True #if set to False initially, program will not tell you that aircraft isn't active
         ACTypeHistory = ["zzz_unavailable", "zzz_unavailable", "zzz_unavailable","zzz_unavailable"] #random invalid buffer where json fails to output
+        spinner = itertools.cycle(['-', '/', '|', '\\'])
 
         while True:
-            if(ac.state["valid"] == True and ac.indicators["valid"] == True): #DP: state can lie, but indicators tell the truth
+            ac.indicators = FetchIndicators()
+            ac.state = FetchStatus()
+            if("valid" in ac.state and "valid" in ac.indicators and ac.state["valid"] == True and ac.indicators["valid"] == True): #DP: state can lie, but indicators tell the truth
 
-                ShuffleThroughList(ACTypeHistory, ac.indicators["type"]) 
+                ShuffleThroughList(ACTypeHistory, ac.indicators["type"])
 
+                # shows 8111 hiccups
+                if ACActive == False:
+                    ACActive = True
+                    print("Main Active: " + ac.indicators["type"], end="    |   ")
+                    print("FetchIndicators()    | Active: " + str(ac.indicators["valid"]), end="   |   ")  # stored in dictionary type
+                    print("FetchStatus()        | Active: " + str(ac.state["valid"]))#stored in dictionary type
+
+                # 8111 hiccup immunity
                 if (ACTypeHistory[0] == ACTypeHistory[1] == ACTypeHistory[2] == ACTypeHistory[3] and ACTypeHistory[3] != currentACType):
 
                     print("Main Program: " + ac.indicators["type"])
-                    currentType = ac.indicators["type"]
+                    currentACType = ac.indicators["type"]
                     LoadChanges(ac.indicators["type"], ACsettings)
 
-                    if ACActive == False:
-                        ACActive = True
 
                 #main program checks here
                 #print("Instance Indicator | type: " + ac.indicators["type"])
@@ -85,10 +93,17 @@ class Program: #"blueprint"
             else:
                 if ACActive == True:
                     ACActive = False
+                    print("FetchIndicators()    | Aircraft Not Active", end="       |   ")
+                    print("FetchStatus()        | Aircraft Not Active")
                     print("Main Program: Aircraft Not Active")
 
             #At the end of main loop:
             time.sleep(0.125)
+
+            #spinner thing to show it is active ripped from stackoverlow
+            sys.stdout.write(next(spinner))  # write the next character
+            sys.stdout.flush()                # flush stdout buffer (actual character display)
+            sys.stdout.write('\b')            # erase the last written char
 
 def PlayWarning(warningtype, indication):
     print(str(warningtype) + " Warning: " + str(indication))  #Replace this with sound playback l8r
@@ -103,11 +118,9 @@ def FetchIndicators():
         #with urllib.request.urlopen("http://localhost:8111/indicators") as url:
             #indicators = json.loads(url.read().decode())
         indicators = requests.get("http://localhost:8111/indicators", timeout=0.02).json()
-        print("FetchIndicators()    | Active: " + str(indicators["valid"]))#stored in dictionary type
         return indicators
     except:
-        print("FetchIndicators()    | Aircraft Not Active")
-        indicators["Valid"] = False
+        indicators["alid"] = False
         indicators["type"] = "zzz_unavailable"
         return indicators
 
@@ -115,17 +128,15 @@ def FetchStatus():
     state = {}
     try:
         state = requests.get("http://localhost:8111/state", timeout=0.02).json()
-        print("FetchStatus()        | Active: " + str(state["valid"]))#stored in dictionary type
         return state
         #States are given in dict fomat "title, unit": value
     except:
         state["valid"] = False
         state["type"] = "zzz_unavailable"
-        print("FetchStatus()        | Aircraft Not Active")
         return state
 
 def SaveChanges(ACType, settings):
-    continYN = inputSomething("Y to save\n> ")
+    continYN = InputSomething("Y to save\n> ")
     if continYN == "Y":
         file = open(ACType + ".json", "w")
         json.dump(settings, file)
@@ -172,9 +183,9 @@ def InputSomething(prompt):
             print("Please try something else, you're not doing it right")
             continue
 
-def ShuffleThroughList(var, input):#might be computationally inefficient
-    var.remove(0)
-    var.append(input)
+def ShuffleThroughList(zalist, input):#might be computationally inefficient
+    del zalist[0]
+    zalist.append(input)
     return
 
 PyBetty = Program()
