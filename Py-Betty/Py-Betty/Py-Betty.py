@@ -1,5 +1,5 @@
 # Py-Betty - ZdrytchX
-#debugging cmd line python -m ipdb Py_Betty.py
+#debugging cmd line python -m ipdb Py-Betty.py
 #import tkinter
 #import tkinter.messagebox
 import time
@@ -19,7 +19,8 @@ class settings: #more like a data struct
         self.MaxTemp        #max raw temperature
         self.MaxOilTemp     #max oil temperature
         self.MaxWaterTemp   #max water temperature
-        self.MaxAoA         #max angle of attack
+        self.AoAWarn        #AoA warning
+        self.AoAMax         #max angle of attack
         self.GearUp         #GearUp threshold
         self.GearDn         #GearDown threshold
         self.MaxRPM         #Max RPM
@@ -37,8 +38,14 @@ class settings: #more like a data struct
         #Indicators
         self.MaxBankAngle   #Max Banking Angle for Autopilot
 
-def SetSettings(data): #TODO: Iterate through to get a more definitive long term solution
-    data = {"Redline", "MaxTemp", "MaxOilTemp","MaxWaterTemp","MaxAoA","GearUp","GearDn","MaxRPM","Mach","Flaps1","Flaps2","Flaps3","GLoad","GLoad-Ve","MaxDescent","MaxAoS","BingoFuel","BingoFuelRepeats","Economy","MaxBankAngle"}
+
+#List of uservalues
+#{"Redline", "MaxTemp", "MaxOilTemp","MaxWaterTemp","MaxAoA","GearUp","GearDn","MaxRPM","Mach","Flaps1","Flaps2","Flaps3","GLoad","GLoad-Ve","MaxDescent","MaxAoS","BingoFuel","BingoFuelRepeats","Economy","MaxBankAngle"}
+
+#TODO: Iterate through to get a more definitive long term solution
+#Ideally, it should just grab only the necessary values off 8111
+def SetSettings(data): 
+    data = ["Redline", "MaxTemp", "MaxOilTemp","MaxWaterTemp","MaxAoA","GearUp","GearDn","MaxRPM","Mach","Flaps1","Flaps2","Flaps3","GLoad","GLoad-Ve","MaxDescent","MaxAoS","BingoFuel","BingoFuelRepeats","Economy","MaxBankAngle"]#needs to be dict later but regular list for now
 
 class Navigation: #Mostly for autopilot integreation possibility
     def __init__(self):
@@ -52,17 +59,33 @@ class Program: #"blueprint"
     def __init__(ac, *args, **kwargs):
         ac.indicators = FetchIndicators()
         ac.state = FetchStatus()
+        ACsettings = {}
+        currentACType = "zzz_unavailable"
+        ACActive = True #if set to False initially, program will not tell you that aircraft isn't active
+        ACTypeHistory = ["zzz_unavailable", "zzz_unavailable", "zzz_unavailable","zzz_unavailable"] #random invalid buffer where json fails to output
 
         while True:
-            if(ac.state["valid"] == True): #state valid likely means the same for indicators
-                ACsettings = []
-                LoadChanges(ac.indicators["type"], ACsettings)
+            if(ac.state["valid"] == True and ac.indicators["valid"] == True): #DP: state can lie, but indicators tell the truth
+
+                ShuffleThroughList(ACTypeHistory, ac.indicators["type"]) 
+
+                if (ACTypeHistory[0] == ACTypeHistory[1] == ACTypeHistory[2] == ACTypeHistory[3] and ACTypeHistory[3] != currentACType):
+
+                    print("Main Program: " + ac.indicators["type"])
+                    currentType = ac.indicators["type"]
+                    LoadChanges(ac.indicators["type"], ACsettings)
+
+                    if ACActive == False:
+                        ACActive = True
+
                 #main program checks here
                 #print("Instance Indicator | type: " + ac.indicators["type"])
                 #print("Instance Status | AoA:" + str(ac.state["AoA, deg"]))
 
             else:
-                print("Aircraft Not Active")
+                if ACActive == True:
+                    ACActive = False
+                    print("Main Program: Aircraft Not Active")
 
             #At the end of main loop:
             time.sleep(0.125)
@@ -75,26 +98,30 @@ def CheckExceeded(warningtype, indication):
     pass
 
 def FetchIndicators():
-    indicators = []
+    indicators = {}
     try:
         #with urllib.request.urlopen("http://localhost:8111/indicators") as url:
             #indicators = json.loads(url.read().decode())
         indicators = requests.get("http://localhost:8111/indicators", timeout=0.02).json()
-        print("FetchIndicators() | Active: " + str(indicators["valid"]))#stored in dictionary type
+        print("FetchIndicators()    | Active: " + str(indicators["valid"]))#stored in dictionary type
         return indicators
     except:
-        print("FetchIndicators() | nothing here yet")
+        print("FetchIndicators()    | Aircraft Not Active")
+        indicators["Valid"] = False
+        indicators["type"] = "zzz_unavailable"
         return indicators
 
 def FetchStatus():
-    state = []
+    state = {}
     try:
         state = requests.get("http://localhost:8111/state", timeout=0.02).json()
-        print("FetchStatus() | Active: " + str(state["valid"]))#stored in dictionary type
+        print("FetchStatus()        | Active: " + str(state["valid"]))#stored in dictionary type
         return state
         #States are given in dict fomat "title, unit": value
     except:
-        print("FetchStatus() | nothing here yet")
+        state["valid"] = False
+        state["type"] = "zzz_unavailable"
+        print("FetchStatus()        | Aircraft Not Active")
         return state
 
 def SaveChanges(ACType, settings):
@@ -117,6 +144,7 @@ def LoadChanges(ACType, settings):
     except:#no file present, file gets created when we save later
         print("No " + ACType + ".json file was found or was corrupted.")
         SetSettings(settings)
+        SaveChanges(ACType, settings)
 
 #Basic navigation functions til we get UI
 # Accepts only integers
@@ -143,6 +171,11 @@ def InputSomething(prompt):
         except:#obligatory backup exception for re-input
             print("Please try something else, you're not doing it right")
             continue
+
+def ShuffleThroughList(var, input):#might be computationally inefficient
+    var.remove(0)
+    var.append(input)
+    return
 
 PyBetty = Program()
 
